@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 
 try:
@@ -931,6 +932,20 @@ class App(Gtk.Application):
             assert "#1e66f5" in window.legend.get_label()
             self.save_snapshot(window, "/tmp/sofle-studio-theme-preview.png")
             assert self.get_accels_for_action("app.quit") == ["<Control>q"]
+            self.cpu_start = time.process_time()
+            GLib.timeout_add(1000, self.smoke_idle_cpu, window)
+        except Exception:
+            traceback.print_exc()
+            self.smoke_failed = True
+            self.quit()
+        return False
+
+    def smoke_idle_cpu(self, window):
+        try:
+            # An idle app sleeps between its 250 ms ticks. A callback that keeps rescheduling itself,
+            # such as GLib.idle_add(widget.grab_focus), uses about a second of CPU time per second.
+            used = time.process_time() - self.cpu_start
+            assert used < 0.25, f"Idle app used {used:.2f}s of CPU time in 1s; a callback may be repeating"
             print(f"Native UI checks passed. Fonts tried: {', '.join(self.smoke_fonts) or 'none'}. "
                   "Preview: /tmp/sofle-studio-preview.png", flush=True)
             # Leave through the same action Ctrl+Q triggers.
