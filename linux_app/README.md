@@ -61,9 +61,10 @@ The app works offline. Dependency installation may need an internet connection.
 
 ## Match your keyboard
 
-The starting **QWERTY** preset is a sample Sofle mapping. Letter positions are
-standard QWERTY; thumb keys and the symbol layer may differ from your firmware.
-An alternative Colemak-DH preset is included.
+The starting **QWERTY** preset follows the stock QMK Sofle keymap, the same
+default as the web app: its base layer, thumb keys, and LOWER layer as the
+symbol layer. An alternative Colemak-DH preset uses the same thumb keys and
+symbol layer. If your firmware differs, edit the keymap to match it.
 
 1. Choose **Edit keymap**.
 2. Click a key on the diagram.
