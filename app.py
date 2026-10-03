@@ -428,12 +428,20 @@ class TrainerWindow(Gtk.ApplicationWindow):
         self.connect("close-request", self.closing)
         self.tick_id = GLib.timeout_add(250, self.tick)
         self.refresh()
-        GLib.idle_add(self.practice.grab_focus)
+        GLib.idle_add(self.focus_practice)
 
     def closing(self, *_):
         GLib.source_remove(self.tick_id)
         if self.flash_timer:
             GLib.source_remove(self.flash_timer)
+        return False
+
+    def focus_practice(self):
+        """Focus the practice text; scheduled with GLib.idle_add, so it must return False."""
+        self.practice.grab_focus()
+        # GLib reruns an idle callback for as long as it returns True, and grab_focus returns True
+        # when it succeeds. Passing grab_focus to idle_add directly kept a CPU core at 100% for the
+        # app's lifetime and kept the process running after its window was closed.
         return False
 
     def activation_changed(self, *_):
@@ -506,7 +514,7 @@ class TrainerWindow(Gtk.ApplicationWindow):
         self.keyboard.flash = None
         self.auto_paused = False
         self.refresh()
-        GLib.idle_add(self.practice.grab_focus)
+        GLib.idle_add(self.focus_practice)
 
     def restart(self):
         self.reset_to(self.session.target)
@@ -558,7 +566,7 @@ class TrainerWindow(Gtk.ApplicationWindow):
             if not was_paused and self.session.paused_at is not None:
                 self.session.toggle_pause()
             self.refresh()
-            GLib.idle_add(self.practice.grab_focus)
+            GLib.idle_add(self.focus_practice)
             return False
         dialog.connect("close-request", closed)
         return dialog, box
