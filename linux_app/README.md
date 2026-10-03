@@ -85,6 +85,25 @@ your keymap, but it cannot verify which physical switch, finger or firmware
 layer produced a character. Configure your existing keyboard firmware to
 produce the characters you expect; this app performs no layout emulation.
 
+## Theme
+
+On Omarchy, the app uses the colours of your current theme, including light
+themes. Change the theme with `omarchy theme set` or the Omarchy menu, and the
+open app restyles itself within a moment; no restart is needed.
+
+All text uses your Omarchy font, as the Omarchy bar and menus do. Change it
+with `omarchy font set` or the Omarchy menu, and the open app switches to it as
+well.
+
+The colours come from `~/.local/state/omarchy/current/theme/colors.toml`, and the
+font is your system monospace font, which `omarchy font set` writes to
+`~/.config/fontconfig/fonts.conf`. Until a font has been set there, the app uses
+JetBrains Mono, Omarchy's default font.
+
+Without Omarchy, the app uses its own dark theme and JetBrains Mono. The font
+ships in `fonts/` and is loaded by the app itself, so nothing needs installing.
+JetBrains Mono is licensed under the SIL Open Font License; see `fonts/OFL.txt`.
+
 ## Practice
 
 - **Letters:** home, upper, lower row or all letters, using your saved keymap.
@@ -94,11 +113,12 @@ produce the characters you expect; this app performs no layout emulation.
 - **Custom text:** paste your own sentences or code, including line breaks.
 
 Click the practice text and start typing. Mistakes stay on the current
-character until you press it correctly. Red feedback marks an error; green
-marks the next key; amber marks a modifier to hold. Finger guidance is shown
-above the keyboard. Backspace rewinds one correctly typed character. Press
-**Esc** to pause, **Ctrl+R** to restart, and **Enter** after finishing to start
-the next lesson. Switching away from the app pauses the timer automatically.
+character until you press it correctly. Your theme's red marks an error, its
+accent colour marks the next key, and its yellow marks a modifier to hold.
+Finger guidance is shown above the keyboard. Backspace rewinds one correctly
+typed character. Press **Esc** to pause, **Ctrl+R** to restart, **Ctrl+Q** to
+quit, and **Enter** after finishing to start the next lesson. Switching away
+from the app pauses the timer automatically.
 
 WPM is completed characters divided by five, per active minute. Accuracy counts
 all character attempts, including retries. Backspacing does not erase error
@@ -148,10 +168,12 @@ QWERTY keymap next time.
 linux_app/
 ├── app.py                 GTK interface and native UI checks
 ├── trainer.py             Typing logic, lessons and keymaps
+├── theme.py               Omarchy theme colours and font
+├── fonts/                 Bundled JetBrains Mono and its licence
 ├── run.sh                 App launcher
 ├── README.md              Installation and usage instructions
 ├── preview.png            App screenshot
-├── tests/test_trainer.py  Automated logic tests
+├── tests/                 Automated logic and theme tests
 ├── .gitignore             Excludes local data and Python caches
 └── .data/                 Local settings and history (created on use)
 ```
@@ -165,9 +187,15 @@ python3 -m unittest discover -s tests -v
 ./run.sh --smoke-test
 ```
 
-The smoke test opens a temporary window, exercises native UI flows, saves a
-preview to `/tmp/sofle-studio-preview.png`, and exits. It uses temporary settings
-and leaves your saved keymap and practice history alone.
+The smoke test opens a temporary window, exercises native UI flows, switches
+between two temporary themes and two installed fonts to check live reloading,
+saves previews to `/tmp/sofle-studio-preview.png` and
+`/tmp/sofle-studio-theme-preview.png`, and exits. It uses temporary settings,
+themes and font settings, and leaves your saved keymap and practice history and
+your desktop theme and font alone.
+
+If your screen is off or asleep, the compositor stops drawing windows, so the
+smoke test skips its previews and says so; its other checks still run.
 
 ## Troubleshooting
 
