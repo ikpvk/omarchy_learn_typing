@@ -1,0 +1,9 @@
+# Local tooling and credentials
+.agents/
+.aws/
+.codex/
+
+# Local app state and Python caches
+.data/
+__pycache__/
+*.pyc
