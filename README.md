@@ -184,7 +184,8 @@ python3 -m unittest discover -s tests -v
 The smoke test opens a temporary window, exercises native UI flows, switches
 between two temporary themes and two installed fonts to check live reloading,
 saves previews to `/tmp/sofle-studio-preview.png` and
-`/tmp/sofle-studio-theme-preview.png`, and exits. It uses temporary settings,
+`/tmp/sofle-studio-theme-preview.png`, checks that the app uses almost no CPU
+while idle, and exits. It uses temporary settings,
 themes and font settings, and leaves your saved keymap and practice history and
 your desktop theme and font alone.
 
