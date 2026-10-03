@@ -35,15 +35,15 @@ ROLES = ("Character", "Shift", "Layer", "Backspace", "Control", "Alt", "Super")
 def preset(name: str = "QWERTY") -> list[Key]:
     if name not in PRESETS:
         raise ValueError("Unknown keymap preset")
-    left = ["\x1b12345", "\tqwert", "\x1basdfg", "\x00zxcvb"]
+    # Base and LOWER layers follow the stock QMK Sofle keymap, like the web app.
+    left = ["`12345", "\x1bqwert", "\tasdfg", "\x00zxcvb"]
     right = ["67890`", "yuiop\b", "hjkl;'", "nm,./\x00"]
     if name == "Colemak-DH":
-        left[1:] = ["\tqwfpb", "\x1barstg", "\x00zxcdv"]
+        left[1:] = ["\x1bqwfpb", "\tarstg", "\x00zxcdv"]
         right[1:] = ["jluy;\b", "mneio'", "kh,./\x00"]
     shift = dict(zip("1234567890`-=[]\\;',./", "!@#$%^&*()~_+{}|:\"<>?"))
-    # A starting symbol layer, to be edited to match the user's firmware.
-    layer_left = ["", "\x00!@#$%", "\x00()[]{}", "\x00-_=+|"]
-    layer_right = ["", "^&*()\x00", "{}[]=\x00", "\\:;<>\x00"]
+    layer_left = ["", "`12345", "\x00!@#$%", "\x00=-+{}"]
+    layer_right = ["", "67890\x00", "^&*()|", "[];:\\\x00"]
     keys = []
     for hand, rows, layers in (("Left", left, layer_left), ("Right", right, layer_right)):
         for row, chars in enumerate(rows):
@@ -51,12 +51,13 @@ def preset(name: str = "QWERTY") -> list[Key]:
                 role = "Shift" if char == "\x00" else "Backspace" if char == "\b" else "Character"
                 base = "" if char in "\x00\x1b\b" else char
                 layer_char = layers[row][col] if len(layers[row]) > col else ""
+                layer_char = "" if layer_char == "\x00" else layer_char
                 keys.append(Key(f"{hand[0]}{row}{col}", hand, row, col, base,
                                 base.upper() if base.isalpha() else shift.get(base, ""),
-                                "" if layer_char == "\x00" else layer_char, role=role))
-        thumbs = [("", "Super"), ("", "Alt"), ("", "Control"), ("", "Layer"), (" ", "Character")]
+                                layer_char, shift.get(layer_char, ""), role=role))
+        thumbs = [("", "Super"), ("", "Alt"), ("", "Control"), ("", "Layer"), ("\n", "Character")]
         if hand == "Right":
-            thumbs = [("\n", "Character"), ("", "Layer"), ("", "Control"), ("", "Alt"), ("", "Super")]
+            thumbs = [(" ", "Character"), ("", "Layer"), ("", "Control"), ("", "Alt"), ("", "Super")]
         for col, (base, role) in enumerate(thumbs):
             keys.append(Key(f"{hand[0]}4{col}", hand, 4, col, base, role=role))
     return keys

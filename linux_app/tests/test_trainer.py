@@ -15,8 +15,16 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(guide.key.id, "L24")
         self.assertEqual(guide.key.finger, "Left index finger")
         self.assertEqual(guide.modifiers, ())
-        self.assertEqual(resolve(keys, " ").key.finger, "Left thumb")
-        self.assertEqual(resolve(keys, "\n").key.id, "R40")
+        self.assertEqual(resolve(keys, " ").key.finger, "Right thumb")
+        self.assertEqual(resolve(keys, "\n").key.id, "L44")
+        self.assertEqual(resolve(keys, "\t").key.id, "L20")
+
+    def test_qwerty_matches_stock_qmk_lower_layer(self):
+        keys = preset()
+        for char, key_id, field in (("=", "L31", "layer"), ("_", "L32", "layer_shifted"),
+                                    ("|", "R25", "layer"), ("\\", "R34", "layer")):
+            guide = resolve(keys, char)
+            self.assertEqual((guide.key.id, guide.field), (key_id, field), char)
 
     def test_uppercase_uses_opposite_shift(self):
         guide = resolve(preset(), "F")

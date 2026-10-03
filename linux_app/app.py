@@ -118,7 +118,7 @@ def key_label(key, field="base"):
         return {"Backspace": "⌫", "Control": "Ctrl", "Super": "Super", "Layer": "Layer"}.get(key.role, key.role)
     char = getattr(key, field)
     if not char:
-        return "Esc" if key.id in ("L00", "L20") else "—"
+        return "Esc" if key.id == "L10" else "—"
     return display_char(char).upper() if char.isalpha() else display_char(char)
 
 
@@ -784,11 +784,11 @@ class App(Gtk.Application):
             keyboard.select(thumb)
             entries = [w for w in widgets if isinstance(w, Gtk.Entry)]
             assert len(entries) == 5
-            entries[1].set_text("SPACE")
+            entries[1].set_text("ENTER")
             save = next(w for w in widgets if isinstance(w, Gtk.Button) and w.get_label() == "Save keymap")
             save.emit("clicked")
             assert not window.dialog_open
-            assert next(k for k in window.keys if k.id == "R40").base == " "
+            assert next(k for k in window.keys if k.id == "R40").base == "\n"
             assert (DATA / "keymap.json").exists()
             window.keys = preset()
             window.keymap_name = "QWERTY"
