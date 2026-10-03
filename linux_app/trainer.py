@@ -35,7 +35,7 @@ ROLES = ("Character", "Shift", "Layer", "Backspace", "Control", "Alt", "Super")
 def preset(name: str = "QWERTY") -> list[Key]:
     if name not in PRESETS:
         raise ValueError("Unknown keymap preset")
-    # Base and LOWER layers follow the stock QMK Sofle keymap, like the web app.
+    # Base and LOWER layers follow the stock QMK Sofle keymap.
     left = ["`12345", "\x1bqwert", "\tasdfg", "\x00zxcvb"]
     right = ["67890`", "yuiop\b", "hjkl;'", "nm,./\x00"]
     if name == "Colemak-DH":
