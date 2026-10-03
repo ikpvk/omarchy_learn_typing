@@ -1,0 +1,21 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # System Python with PyGObject, Pango and fontconfig, matching how run.sh starts the app.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-pango-1.0 fontconfig
+      - name: Run unit tests
+        working-directory: linux_app
+        run: /usr/bin/python3 -m unittest discover -s tests -v
