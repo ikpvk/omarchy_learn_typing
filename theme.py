@@ -145,7 +145,7 @@ label.metric, textview {{ font-family: {_families(f['mono'])}; }}
 window {{ background: {p['bg']}; color: {p['text']}; }}
 headerbar {{ background: {p['bg']}; color: {p['text']}; box-shadow: none; border-bottom: 1px solid {p['line']}; }}
 label.title {{ font-size: 23px; font-weight: 800; letter-spacing: -0.5px; }}
-label.subtitle, label.muted {{ color: {p['muted']}; }}
+label.muted {{ color: {p['muted']}; }}
 label.eyebrow {{ font-size: 11px; font-weight: bold; letter-spacing: 1.5px; color: {p['muted']}; }}
 label.metric {{ font-size: 28px; font-weight: 700; }}
 label.accent {{ color: {p['accent']}; }}

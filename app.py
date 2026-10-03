@@ -346,14 +346,8 @@ class TrainerWindow(Gtk.ApplicationWindow):
         except (OSError, ValueError):
             pass
 
-        header = Gtk.HeaderBar()
-        brand = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        brand.append(label("Sofle Studio", "title"))
-        brand.append(label("Find your rhythm, one key at a time.", "subtitle"))
-        header.set_title_widget(brand)
-        header.pack_start(label("SOFLE / 58", "badge"))
-        header.pack_end(label("OFFLINE", "badge"))
-        self.set_titlebar(header)
+        # No title bar: Omarchy tiles windows and closes them with its own shortcut, and Ctrl+Q quits.
+        self.set_decorated(False)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
         for setter in (root.set_margin_start, root.set_margin_end, root.set_margin_top, root.set_margin_bottom):
@@ -550,6 +544,11 @@ class TrainerWindow(Gtk.ApplicationWindow):
         # Belonging to the app gives dialogs its shortcuts, such as Ctrl+Q.
         dialog = Gtk.Window(title=title, transient_for=self, modal=True, application=self.get_application())
         dialog.set_default_size(width, height)
+        # Esc leaves without changes, as Cancel does.
+        shortcuts = Gtk.ShortcutController()
+        shortcuts.add_shortcut(Gtk.Shortcut(trigger=Gtk.KeyvalTrigger(keyval=Gdk.KEY_Escape, modifiers=0),
+                                            action=Gtk.NamedAction(action_name="window.close")))
+        dialog.add_controller(shortcuts)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         for setter in (box.set_margin_start, box.set_margin_end, box.set_margin_top, box.set_margin_bottom):
             setter(24)
@@ -830,7 +829,12 @@ class App(Gtk.Application):
 
     def smoke_editor(self, window):
         try:
-            self.close_dialogs(window)
+            # Esc closes a dialog as Cancel does.
+            dialog = next(w for w in Gtk.Window.get_toplevels() if w != window)
+            escape = next(s for c in dialog.observe_controllers() if isinstance(c, Gtk.ShortcutController)
+                          for s in c if isinstance(s.get_trigger(), Gtk.KeyvalTrigger)
+                          and s.get_trigger().get_keyval() == Gdk.KEY_Escape)
+            escape.get_action().activate(Gtk.ShortcutActionFlags(0), dialog, None)
             assert not window.dialog_open
             window.open_editor()
             assert window.dialog_open
@@ -879,12 +883,6 @@ class App(Gtk.Application):
         while child:
             yield from App.walk(child)
             child = child.get_next_sibling()
-
-    @staticmethod
-    def close_dialogs(window):
-        for widget in Gtk.Window.get_toplevels():
-            if widget != window:
-                widget.close()
 
     def smoke_snapshot(self, window):
         try:
