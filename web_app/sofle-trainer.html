@@ -1,0 +1,794 @@
+<title>Sofle Trainer</title>
+<meta name="description" content="Typing trainer for the Sofle split keyboard that highlights the next key on your own keymap.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one centered column. Text to type on top, the Sofle plate below it, controls tucked into a header bar. */
+:root {
+  --bg: #eceff3;
+  --panel: #f8f9fb;
+  --ink: #1a1e26;
+  --muted: #646d7f;
+  --line: #d3d8e1;
+  --plate: #d9dee7;
+  --keycap: #ffffff;
+  --keyedge: #c3c9d4;
+  --accent: #e8900c;
+  --accent-ink: #1a1e26;
+  --good: #23885c;
+  --bad: #cf3f55;
+  --f-pinky: #e6dbf6;
+  --f-ring: #d6e6fb;
+  --f-middle: #d4efe2;
+  --f-index: #f8ebcf;
+  --f-thumb: #f4dbe2;
+  --font-ui: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "JetBrains Mono", monospace;
+  --u: min(58px, calc((100vw - 40px) / 15.4));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #191d25; --ink: #e5e8ee; --muted: #8a92a4; --line: #2a303b;
+    --plate: #0c0e12; --keycap: #222731; --keyedge: #333a47; --accent: #ffad33; --accent-ink: #12151b;
+    --good: #4cc38a; --bad: #ff6b7d;
+    --f-pinky: #2d2740; --f-ring: #1f2c45; --f-middle: #1d3630; --f-index: #3a311d; --f-thumb: #3a232c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #191d25; --ink: #e5e8ee; --muted: #8a92a4; --line: #2a303b;
+  --plate: #0c0e12; --keycap: #222731; --keyedge: #333a47; --accent: #ffad33; --accent-ink: #12151b;
+  --good: #4cc38a; --bad: #ff6b7d;
+  --f-pinky: #2d2740; --f-ring: #1f2c45; --f-middle: #1d3630; --f-index: #3a311d; --f-thumb: #3a232c;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-ui); font-size: 15px; padding-inline: 16px; padding-block: 18px 32px; }
+main { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.brand { font-family: var(--font-mono); font-weight: 600; font-size: 15px; letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
+.brand .led { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.tabs { display: flex; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.tabs button { font: inherit; border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.tabs button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+.spacer { flex: 1; }
+.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.danger { color: var(--bad); }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stats { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 28px; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.stat .v { font-family: var(--font-mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 12px; color: var(--muted); }
+.spark { width: 140px; height: 30px; }
+.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.spark circle { fill: var(--accent); }
+.toast { margin-left: auto; font-size: 13px; color: var(--accent-ink); background: var(--accent); padding: 4px 10px; border-radius: 99px; opacity: 0; transition: opacity .3s; }
+.toast.show { opacity: 1; }
+
+.letters { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.letters .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 6px; }
+.chip { font-family: var(--font-mono); font-size: 13px; width: 26px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); position: relative; overflow: hidden; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.chip .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--muted); }
+.chip.pass .bar { background: var(--good); }
+.chip.locked { color: var(--muted); opacity: .45; border-style: dashed; }
+.chip.focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.options { display: flex; gap: 16px; font-size: 14px; color: var(--muted); min-height: 0; }
+.options label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+.textbox { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; }
+.text { font-family: var(--font-mono); font-size: clamp(18px, 2.6vw, 26px); line-height: 1.9; height: calc(1.9em * 3); overflow: hidden; color: var(--muted); }
+.word { display: inline-block; white-space: pre; }
+.ch { position: relative; border-radius: 3px; transition: color .08s; }
+.ch.done { color: var(--ink); }
+.ch.done.err { color: var(--bad); }
+.ch.sp.done.err { background: color-mix(in oklab, var(--bad) 30%, transparent); }
+.ch.cur { color: var(--ink); background: color-mix(in oklab, var(--accent) 22%, transparent); box-shadow: inset 0 -3px 0 var(--accent); }
+.ch.cur.err { background: color-mix(in oklab, var(--bad) 25%, transparent); box-shadow: inset 0 -3px 0 var(--bad); }
+.shake { animation: shake .18s; }
+@keyframes shake { 25% { transform: translateX(-2px) } 75% { transform: translateX(2px) } }
+.blurred { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in oklab, var(--panel) 80%, transparent); backdrop-filter: blur(3px); border-radius: 12px; font-size: 15px; color: var(--ink); cursor: pointer; }
+
+.hintline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 30px; font-size: 14px; color: var(--muted); }
+.hintline .nk { font-family: var(--font-mono); font-size: 16px; color: var(--accent-ink); background: var(--accent); min-width: 30px; text-align: center; padding: 2px 8px; border-radius: 6px; }
+.hintline b { color: var(--ink); font-weight: 700; }
+.layers { margin-left: auto; display: flex; gap: 4px; }
+.layers button { font: inherit; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 3px 9px; border-radius: 99px; cursor: pointer; }
+.layers button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); background: color-mix(in oklab, var(--accent) 18%, transparent); }
+
+.kbwrap { overflow-x: auto; padding-block: 6px; }
+.kb { position: relative; width: calc(var(--u) * 15); height: calc(var(--u) * 5.75); margin: 0 auto; }
+.half { position: absolute; top: calc(var(--u) * -0.22); width: calc(var(--u) * 7.3); height: calc(var(--u) * 5.95); background: var(--plate); border-radius: calc(var(--u) * 0.3); }
+.half.l { left: calc(var(--u) * -0.22); border-bottom-right-radius: calc(var(--u) * 1.2); }
+.half.r { right: calc(var(--u) * -0.22); border-bottom-left-radius: calc(var(--u) * 1.2); }
+.enc { position: absolute; width: calc(var(--u) * .78); height: calc(var(--u) * .78); border-radius: 50%; left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y)); background: repeating-conic-gradient(var(--keyedge) 0 6deg, var(--keycap) 6deg 12deg); border: 2px solid var(--keyedge); }
+.key {
+  position: absolute; left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y));
+  width: calc(var(--u) * .92); height: calc(var(--u) * .92); transform: rotate(var(--r, 0deg));
+  background: var(--keycap); border: 1px solid var(--keyedge); border-bottom-width: calc(var(--u) * .07);
+  border-radius: calc(var(--u) * .14); display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: calc(var(--u) * .3); color: var(--ink);
+  transition: background .12s, box-shadow .12s, transform .08s;
+}
+.key .lab { line-height: 1; }
+.key.small .lab { font-size: calc(var(--u) * .19); font-family: var(--font-ui); letter-spacing: .02em; }
+.fingers .key.f-pinky { background: var(--f-pinky); }
+.fingers .key.f-ring { background: var(--f-ring); }
+.fingers .key.f-middle { background: var(--f-middle); }
+.fingers .key.f-index { background: var(--f-index); }
+.fingers .key.f-thumb { background: var(--f-thumb); }
+.heatmap .key.heat { background: color-mix(in oklab, var(--bad) calc(var(--heat) * 70%), var(--keycap)); }
+.nolabels .key .lab { visibility: hidden; }
+.key.empty .lab { opacity: .25; }
+.key.home::after { content: ""; position: absolute; bottom: 16%; width: 22%; height: 2px; border-radius: 2px; background: var(--muted); }
+.kb .key.next { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 calc(var(--u) * .4) var(--accent); z-index: 2; }
+.kb .key.next .lab { visibility: visible; }
+.kb .key.mod { background: color-mix(in oklab, var(--accent) 30%, var(--keycap)); box-shadow: 0 0 0 2px var(--accent); z-index: 1; }
+.kb .key.mod .lab { visibility: visible; }
+.kb .key.hit { box-shadow: 0 0 0 3px var(--good); }
+.kb .key.miss { box-shadow: 0 0 0 3px var(--bad); background: color-mix(in oklab, var(--bad) 35%, var(--keycap)); }
+@media (prefers-reduced-motion: no-preference) {
+  .kb .key.next { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 2px var(--accent), 0 0 calc(var(--u) * .1) var(--accent); } }
+}
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
+
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--keyedge); }
+footer { font-size: 13px; color: var(--muted); text-align: center; }
+kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dlg { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.dlg h2 { margin: 0; font-size: 18px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.field input[type=number], .field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 15px; color: var(--ink); cursor: pointer; }
+textarea { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; width: 100%; box-sizing: border-box; min-height: 300px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; white-space: pre; overflow: auto; resize: vertical; }
+.help { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
+.err-msg { color: var(--bad); font-size: 13px; white-space: pre-line; margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+</style>
+
+<main>
+  <header>
+    <div class="brand"><span class="led"></span>sofle trainer</div>
+    <div class="tabs" role="group" aria-label="Practice mode">
+      <button data-mode="learn">Learn</button>
+      <button data-mode="words">Words</button>
+      <button data-mode="sentences">Sentences</button>
+      <button data-mode="symbols">Symbols</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="newBtn" title="New lesson (Esc)">New lesson</button>
+    <button class="btn" id="settingsBtn">Settings</button>
+  </header>
+
+  <section class="stats" aria-label="Stats">
+    <div class="stat"><span class="k">Speed</span><span class="v" id="sWpm">–</span></div>
+    <div class="stat"><span class="k">Accuracy</span><span class="v" id="sAcc">–</span></div>
+    <div class="stat"><span class="k">Best</span><span class="v" id="sBest">–</span></div>
+    <div class="stat"><span class="k">Lessons</span><span class="v" id="sCount">0</span></div>
+    <div class="stat"><span class="k">Last 20</span><svg class="spark" id="spark" viewBox="0 0 140 30" aria-hidden="true"></svg></div>
+    <div class="toast" id="toast"></div>
+  </section>
+
+  <div class="letters" id="letters"></div>
+  <div class="options" id="options"></div>
+
+  <div class="textbox">
+    <div class="text" id="text" aria-live="off"></div>
+    <div class="blurred" id="blurred" hidden>Click here, then start typing</div>
+  </div>
+
+  <div class="hintline">
+    <span id="hint"></span>
+    <div class="layers" id="layerTabs" aria-label="Show layer"></div>
+  </div>
+
+  <div class="kbwrap"><div class="kb" id="kb"></div></div>
+  <div class="legend" id="legend">
+    <span><i style="background:var(--f-pinky)"></i>Pinky</span>
+    <span><i style="background:var(--f-ring)"></i>Ring</span>
+    <span><i style="background:var(--f-middle)"></i>Middle</span>
+    <span><i style="background:var(--f-index)"></i>Index</span>
+    <span><i style="background:var(--f-thumb)"></i>Thumb</span>
+  </div>
+  <footer><kbd>Esc</kbd> new lesson · type the right key to move on · progress is saved in this browser</footer>
+</main>
+
+<dialog id="settings">
+  <form class="dlg" method="dialog" id="settingsForm">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label class="field">Target speed (WPM) for unlocking letters
+        <input type="number" id="target" min="10" max="150" step="1">
+      </label>
+      <label class="field">Next-key highlight
+        <select id="hint-mode">
+          <option value="always">Always</option>
+          <option value="delay">After a 1 second pause</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="gap:18px">
+      <label class="check"><input type="checkbox" id="opt-fingers"> Finger colors</label>
+      <label class="check"><input type="checkbox" id="opt-labels"> Key labels</label>
+      <label class="check"><input type="checkbox" id="opt-heat"> Mistake heatmap</label>
+    </div>
+    <div class="field" style="gap:8px">
+      <span style="color:var(--ink);font-size:15px;font-weight:700">Keymap</span>
+      <p class="help">One line per row: 6 keys, an optional <code>|</code>, then 6 keys. The thumb row is 5 + 5. Single characters are typed as-is. Names: SPC ENT BSPC TAB ESC LSFT RSFT CTRL ALT GUI DEL. <code>___</code> means "same as base", <code>XXX</code> means nothing. A key named after a layer (LOWER, RAISE) switches to that layer. Start each layer with a header like <code>[lower]</code>.</p>
+      <textarea id="keymap" spellcheck="false" aria-label="Keymap"></textarea>
+      <p class="err-msg" id="kmErr"></p>
+      <div class="row">
+        <button type="button" class="btn primary" id="applyKm">Apply keymap</button>
+        <button type="button" class="btn" id="resetKm">Restore Sofle default</button>
+      </div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn danger" id="resetProgress">Reset progress</button>
+      <div class="spacer"></div>
+      <button class="btn primary" value="close">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const DEFAULT_KEYMAP = `// Sofle default QMK keymap. Edit to match your own.
+[base]
+\`    1    2    3    4    5    |  6    7    8    9    0    \`
+ESC  q    w    e    r    t    |  y    u    i    o    p    BSPC
+TAB  a    s    d    f    g    |  h    j    k    l    ;    '
+LSFT z    x    c    v    b    |  n    m    ,    .    /    RSFT
+GUI  ALT  CTRL LOWER ENT      |  SPC  RAISE CTRL ALT GUI
+
+[lower]
+___  F1   F2   F3   F4   F5   |  F6   F7   F8   F9   F10  F11
+\`    1    2    3    4    5    |  6    7    8    9    0    F12
+___  !    @    #    $    %    |  ^    &    *    (    )    |
+___  =    -    +    {    }    |  [    ]    ;    :    \\    ___
+___  ___  ___  ___  ___       |  ___  ___  ___  ___  ___
+
+[raise]
+___  ___  ___  ___  ___  ___  |  ___  ___  ___  ___  ___  ___
+___  INS  PSCR APP  XXX  XXX  |  PGUP WLFT UP   WRGT DLIN BSPC
+___  ALT  CTRL SHFT XXX  CAPS |  PGDN LEFT DOWN RGHT DEL  BSPC
+___  UNDO CUT  COPY PSTE XXX  |  XXX  HOME XXX  END  XXX  ___
+___  ___  ___  ___  ___       |  ___  ___  ___  ___  ___
+`;
+
+const NAMES = { SPC:'Space', SPACE:'Space', ENT:'Enter', BSPC:'Bksp', TAB:'Tab', ESC:'Esc', LSFT:'Shift', RSFT:'Shift', SHFT:'Shift',
+  CTRL:'Ctrl', ALT:'Alt', GUI:'Super', DEL:'Del', CAPS:'Caps', LEFT:'←', RGHT:'→', RIGHT:'→', UP:'↑', DOWN:'↓',
+  PGUP:'PgUp', PGDN:'PgDn', HOME:'Home', END:'End', INS:'Ins', PSCR:'PrtSc', APP:'Menu', UNDO:'Undo', CUT:'Cut',
+  COPY:'Copy', PSTE:'Paste', WLFT:'◂Word', WRGT:'Word▸', DLIN:'DelLn', XXX:'' };
+const SHIFT_TOKENS = new Set(['LSFT','RSFT','SHFT']);
+const CHAR_TOKENS = { SPC:' ', SPACE:' ' };
+const SHIFTED = {};
+'`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?'.match(/../g).forEach(p => SHIFTED[p[0]] = p[1]);
+for (let c = 97; c <= 122; c++) SHIFTED[String.fromCharCode(c)] = String.fromCharCode(c - 32);
+
+const FING = ['pinky','pinky','ring','middle','index','index'];
+const STAG = [0.42, 0.42, 0.15, 0, 0.15, 0.27];
+const THUMBS = [[1, 4.42, 0], [2, 4.17, 0], [3, 4.02, 0], [4, 4.17, 0], [5.25, 4.4, 24]];
+const HOME_IDS = new Set(['r2c4', 'r2c7']);
+
+const LETTER_ORDER = 'enitrlasoudychgmpbkvwfzxqj'.split('');
+
+const WORDS = [...new Set(`the be to of and a in that have it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us is was are has had were said did made find long down very still own should through where much those life before right between too here why same last world while great old big under never again home off end part small number since state high place need few house thing every point hand week hold turn group leave keep begin start seem help show line set move live play run tell call ask feel try school name open close real early late best city head eye face fact area word kind side water room mother father level order story young market money light page plan night book form food power hour game land love music river paper party tree earth heart table voice south north idea learn rain near lane tile tire rent tent ten net let lit tin nil inlet enter liter alert later train lean trail inner intern teen lie tie rite little letter retire entire nine linen lint lent tern tier inert tine rein reel eel three trait title tilt niter terrain linear latent rental entail retail lateral tan ant art rat tar tea eat ate era ear earn neat rattle settle nestle listen silent tinsel insert sister resist stern steer street tease taste state stain saint satin snail nails rails trails tries lies ties sit site sir stir rest nest test seat east least list salt slate stale steal tales lease ease sense tense rinse stone store tone note nose rose sore role lore toil oil soil riot iron lion lotion notion ration nation station relation solution sound round until unit unite tune rule true trust trout tour sour loud cloud cold told sold load road toad dinner dollar doctor duty study ready daily yearly yes yet style yellow cry dry clay cart card cord core code decode count court cut cute cure curl huge hug hut hurt hunt hole whole hero heard hard herd chair chain chart cheat child children chore choice such touch teach reach catch match rich each march charge change grand green grow ground guard guide gold glad gate gift magic image large range strange mad map man many mind more moment month mouth mean metal model plant please pocket pond pool pull push put park proper pretty print problem program bank bark base bed bird black blue body bone born box boy break bring brown build bus busy buy bake ball band kid king kit knee knife key kite van very view visit voter value vast wave warm watch wash we wear west wet white wide wife wild wind window winter wish wood write wrong fan far farm fast fat fear field fight fill fine fire fish five fix flat floor flow flower fly fold follow foot force forest four free fresh friend front fruit full fun funny zoo zero zone zip quiz quick quiet quite queen question extra exact exit six next text tax fox mix jar jet job join joke joy judge juice jump jazz`.split(/\s+/))];
+
+const SENTENCES = [
+  "The quick brown fox jumps over the lazy dog.",
+  "Practice slowly at first, then let the speed come on its own.",
+  "Keep your fingers on the home row and let each one own its column.",
+  "A split keyboard keeps your wrists straight and your shoulders open.",
+  "Every key you learn without looking makes the next one easier.",
+  "She packed five dozen jugs of liquid veneer before noon.",
+  "Small daily sessions beat one long weekend of practice.",
+  "The river ran quietly past the old mill at the edge of town.",
+  "Good typing is mostly calm, steady rhythm and very few mistakes.",
+  "My terminal opens in a split second, ready for the next command.",
+  "Pack my box with five dozen liquor jugs.",
+  "When in doubt, slow down and hit the right key the first time.",
+  "The weather turned cold, so we lit a fire and made some tea.",
+  "Thumbs are strong fingers, so give them the keys you press most.",
+  "He wrote the plan on paper, then typed it up the next morning.",
+  "Learning a new layout feels slow for a week and then it clicks.",
+  "Bright lights from the city made the night sky look pale and flat.",
+  "Sphinx of black quartz, judge my vow.",
+  "We should meet at the station at half past seven tomorrow.",
+  "Her notes were short, clear, and easy to read at a glance.",
+  "Move the window to the left, then open a new terminal on the right.",
+  "Accuracy first; speed is just accuracy that has been repeated.",
+  "The keyboard sat on a wooden desk next to a cup of cold coffee.",
+  "Jackdaws love my big sphinx of quartz.",
+  "Rest your hands for a minute whenever they start to feel tense.",
+  "Our team shipped the update on Friday and nothing broke.",
+  "The map showed three trails, but only one led to the lake.",
+  "Typing without looking is a habit, and habits take a few weeks.",
+  "Is it better to learn the symbols now, or after the letters?",
+  "Turn the knob to change the volume, then press it to mute.",
+];
+
+const SNIPPETS = [
+  "(a + b) * c", "x = [1, 2, 3];", "if (n > 0) { n--; }", "~/.config/hypr", "$HOME/.local/bin",
+  "git commit -m \"fix typo\"", "a && b || c", "user@host:~$", "50% off!", "#include <stdio.h>",
+  "arr[i] = i * 2;", "{ \"key\": \"value\" }", "x != y", "a == b", "i += 1", "f(x) = x^2",
+  "path/to/file.txt", "echo $PATH | grep bin", "ls -la ~/", "100 * 3 = 300", "(1 + 2) / 3",
+  "list[-1]", "fn(a, b);", "def main():", "let x = 42;", "const y = x ?? 0;", "# heading", "@user",
+  "price: $19.99", "snake_case_name", "kebab-case-name", "<div>", "</div>", "x => x * 2",
+  "[ -f ~/.bashrc ]", "sudo pacman -Syu", "2026-10-03", "12:45", "3.14159", "v1.2.3", "#ff8800",
+  "^[a-z]+$", "`code`", "'quoted'", "a \\ b", "{}", "[]", "()", "<>", "!==", "&&", "||", "->", "::",
+];
+
+/* ---------- storage ---------- */
+const STORE = 'sofle-trainer-v1';
+function load() { try { return JSON.parse(localStorage.getItem(STORE)) || null; } catch { return null; } }
+function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} }
+const state = load() || {};
+state.keymap ??= DEFAULT_KEYMAP;
+state.settings = Object.assign({ target: 30, hint: 'always', fingers: true, labels: true, heat: false, punct: false }, state.settings || {});
+state.keyStats ??= {};
+state.unlocked ??= 6;
+state.history ??= {};
+state.mode ??= 'learn';
+
+/* ---------- keymap ---------- */
+function parseKeymap(text) {
+  const layers = [], errors = [];
+  let cur = null;
+  text.split('\n').forEach((line, ln) => {
+    const t = line.trim();
+    if (!t || t.startsWith('//')) return;
+    const m = t.match(/^\[([A-Za-z0-9_-]+)\]$/);
+    if (m) { cur = { name: m[1].toLowerCase(), rows: [] }; layers.push(cur); return; }
+    if (!cur) { errors.push(`Line ${ln + 1}: add a layer header such as [base] first.`); return; }
+    if (cur.rows.length >= 5) { errors.push(`Line ${ln + 1}: layer [${cur.name}] already has 5 rows.`); return; }
+    const toks = t.split(/\s+/);
+    const thumb = cur.rows.length === 4, need = thumb ? 10 : 12, mid = thumb ? 5 : 6;
+    if (toks.length === need + 1 && toks[mid] === '|') toks.splice(mid, 1);
+    if (toks.length !== need) { errors.push(`Line ${ln + 1}: expected ${need} keys, found ${toks.length}.`); return; }
+    cur.rows.push(toks);
+  });
+  layers.forEach(l => { if (l.rows.length !== 5) errors.push(`Layer [${l.name}] needs 4 key rows and 1 thumb row; it has ${l.rows.length} rows.`); });
+  if (!layers.length) errors.push('No layers found. Start with a [base] header.');
+  return { layers, errors };
+}
+
+function buildGeom() {
+  const g = {};
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 12; c++) {
+    const left = c < 6, lc = left ? c : 11 - c;
+    g[`r${r}c${c}`] = { id: `r${r}c${c}`, x: left ? lc : 14 - lc, y: r + STAG[lc], rot: 0, hand: left ? 'L' : 'R', finger: FING[lc] };
+  }
+  for (let i = 0; i < 10; i++) {
+    const left = i < 5, [x, y, rot] = THUMBS[left ? i : 9 - i];
+    g[`t${i}`] = { id: `t${i}`, x: left ? x : 14 - x, y, rot: left ? rot : -rot, hand: left ? 'L' : 'R', finger: 'thumb' };
+  }
+  return g;
+}
+const GEOM = buildGeom();
+const IDS = Object.keys(GEOM);
+const idAt = (r, i) => r < 4 ? `r${r}c${i}` : `t${i}`;
+
+function tokChar(tok) {
+  if (tok in CHAR_TOKENS) return CHAR_TOKENS[tok];
+  if (tok.length === 1) return /[A-Za-z]/.test(tok) ? tok.toLowerCase() : tok;
+  return null;
+}
+
+function buildModel(layers) {
+  const L = layers.map(l => ({ name: l.name, tok: {} }));
+  layers.forEach((l, li) => l.rows.forEach((row, r) => row.forEach((tok, i) => {
+    const id = idAt(r, i);
+    L[li].tok[id] = (tok === '___' && li > 0) ? layers[0].rows[r][i] : tok;
+  })));
+  const lookup = new Map();
+  const consider = (ch, p) => { const o = lookup.get(ch); if (!o || o.cost > p.cost) lookup.set(ch, p); };
+  L.forEach((l, li) => IDS.forEach(id => {
+    const ch = tokChar(l.tok[id]); if (ch == null) return;
+    consider(ch, { li, id, shift: false, cost: li * 2 });
+    if (SHIFTED[ch]) consider(SHIFTED[ch], { li, id, shift: true, cost: li * 2 + 1 });
+  }));
+  const layerKey = L.map(l => IDS.find(id => L[0].tok[id].toUpperCase() === l.name.toUpperCase()) || null);
+  const shiftKeys = IDS.filter(id => SHIFT_TOKENS.has(L[0].tok[id]));
+  return { layers: L, lookup, layerKey, shiftKeys };
+}
+
+let model;
+function applyKeymapText(text) {
+  const { layers, errors } = parseKeymap(text);
+  if (errors.length) return errors;
+  model = buildModel(layers);
+  return null;
+}
+if (applyKeymapText(state.keymap)) { state.keymap = DEFAULT_KEYMAP; applyKeymapText(DEFAULT_KEYMAP); }
+
+function planFor(ch) {
+  const p = model.lookup.get(ch);
+  if (!p) return null;
+  const k = GEOM[p.id], mods = [];
+  if (p.li > 0 && model.layerKey[p.li]) mods.push(model.layerKey[p.li]);
+  if (p.shift) {
+    const s = model.shiftKeys.find(id => GEOM[id].hand !== k.hand) || model.shiftKeys[0];
+    if (s) mods.push(s);
+  }
+  return { ...p, key: k, mods };
+}
+const typable = s => [...s].every(c => model.lookup.has(c));
+
+/* ---------- keyboard rendering ---------- */
+const kbEl = document.getElementById('kb');
+const keyEls = {};
+function buildKeyboard() {
+  kbEl.innerHTML = '<div class="half l"></div><div class="half r"></div>';
+  [[6.15, 3.22], [15 - 6.15 - 0.78, 3.22]].forEach(([x, y]) => {
+    const e = document.createElement('div'); e.className = 'enc';
+    e.style.setProperty('--x', x); e.style.setProperty('--y', y); kbEl.appendChild(e);
+  });
+  IDS.forEach(id => {
+    const g = GEOM[id], e = document.createElement('div');
+    e.className = `key f-${g.finger}` + (HOME_IDS.has(id) ? ' home' : '');
+    e.style.setProperty('--x', g.x + 0.04); e.style.setProperty('--y', g.y + 0.04);
+    if (g.rot) e.style.setProperty('--r', g.rot + 'deg');
+    e.innerHTML = '<span class="lab"></span>';
+    kbEl.appendChild(e); keyEls[id] = e;
+  });
+}
+let shownLayer = 0, pinnedLayer = null;
+function labelFor(tok) {
+  if (tok in NAMES) return NAMES[tok];
+  if (tok.length === 1) return /[a-z]/.test(tok) ? tok.toUpperCase() : tok;
+  return tok.length > 5 ? tok.slice(0, 5) : tok;
+}
+function renderLayer(li) {
+  shownLayer = li;
+  const L = model.layers[li];
+  IDS.forEach(id => {
+    const tok = L.tok[id], lab = labelFor(tok), e = keyEls[id];
+    e.firstChild.textContent = lab;
+    e.classList.toggle('small', [...lab].length > 2);
+    e.classList.toggle('empty', tok === 'XXX');
+    const ch = tokChar(tok), ks = ch && state.keyStats[ch.toLowerCase()];
+    if (ks && ks.n >= 3) { e.classList.add('heat'); e.style.setProperty('--heat', Math.min(1, ks.miss * 3).toFixed(2)); }
+    else e.classList.remove('heat');
+  });
+  document.querySelectorAll('#layerTabs button').forEach((b, i) => b.setAttribute('aria-pressed', i === li));
+}
+function renderLayerTabs() {
+  const box = document.getElementById('layerTabs'); box.innerHTML = '';
+  model.layers.forEach((l, i) => {
+    const b = document.createElement('button'); b.textContent = l.name;
+    b.addEventListener('click', ev => { ev.currentTarget.blur(); pinnedLayer = i; renderLayer(i); clearHighlights(); });
+    box.appendChild(b);
+  });
+}
+function applyViewSettings() {
+  const s = state.settings;
+  kbEl.classList.toggle('fingers', s.fingers);
+  kbEl.classList.toggle('nolabels', !s.labels);
+  kbEl.classList.toggle('heatmap', s.heat);
+  document.getElementById('legend').hidden = !s.fingers;
+}
+function clearHighlights() { IDS.forEach(id => keyEls[id].classList.remove('next', 'mod')); }
+function flash(id, cls) {
+  const e = keyEls[id]; if (!e) return;
+  e.classList.remove('hit', 'miss'); void e.offsetWidth; e.classList.add(cls);
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove(cls), 220);
+}
+
+/* ---------- hint ---------- */
+const hintEl = document.getElementById('hint');
+let hintTimer = null;
+const fingerName = k => k.finger === 'thumb' ? `${k.hand === 'L' ? 'left' : 'right'} thumb` : `${k.hand === 'L' ? 'left' : 'right'} ${k.finger}`;
+function showHint(force) {
+  clearTimeout(hintTimer);
+  clearHighlights();
+  pinnedLayer = null;
+  const ch = lesson.text[lesson.pos];
+  const plan = ch != null && planFor(ch);
+  const mode = state.settings.hint;
+  if (!plan) { hintEl.textContent = ''; renderLayer(0); return; }
+  const visible = force || mode === 'always';
+  if (!visible) {
+    hintEl.innerHTML = '';
+    renderLayer(0);
+    if (mode === 'delay') hintTimer = setTimeout(() => showHint(true), 1000);
+    return;
+  }
+  renderLayer(plan.li);
+  keyEls[plan.id].classList.add('next');
+  plan.mods.forEach(id => keyEls[id].classList.add('mod'));
+  const parts = [`<span class="nk">${ch === ' ' ? '␣' : escapeHtml(ch)}</span>`, `<span><b>${fingerName(plan.key)}</b></span>`];
+  if (plan.li > 0) {
+    const lk = model.layerKey[plan.li];
+    const name = model.layers[plan.li].name.toUpperCase();
+    parts.push(`<span>hold <b>${escapeHtml(name)}</b> (${lk ? fingerName(GEOM[lk]) : 'no key for this layer in base'})</span>`);
+  }
+  if (plan.shift) { const s = plan.mods.find(id => SHIFT_TOKENS.has(model.layers[0].tok[id])); parts.push(`<span>+ <b>Shift</b>${s ? ` (${fingerName(GEOM[s])})` : ''}</span>`); }
+  hintEl.innerHTML = parts.join('');
+}
+const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- lesson generation ---------- */
+const rand = n => Math.floor(Math.random() * n);
+const pick = a => a[rand(a.length)];
+function learnLetters() { return LETTER_ORDER.filter(c => model.lookup.has(c)); }
+function keyWpm(ks) { return ks && ks.ema ? 12000 / ks.ema : 0; }
+function keyPasses(c) { const ks = state.keyStats[c]; return !!ks && ks.n >= 8 && keyWpm(ks) >= state.settings.target && ks.miss <= 0.08; }
+function focusLetter(letters) {
+  let best = null, bestScore = Infinity;
+  letters.forEach((c, i) => {
+    const ks = state.keyStats[c];
+    let score = !ks || ks.n < 8 ? -1 + i * 0.001 : Math.min(1, keyWpm(ks) / state.settings.target) - ks.miss * 3;
+    if (score < bestScore) { bestScore = score; best = c; }
+  });
+  return best;
+}
+function pseudoWord(letters, must) {
+  const vowels = letters.filter(c => 'aeiouy'.includes(c)), cons = letters.filter(c => !'aeiouy'.includes(c));
+  const len = 3 + rand(4); let w = '', v = Math.random() < 0.5;
+  for (let i = 0; i < len; i++) { const pool = (v && vowels.length) || !cons.length ? vowels : cons; w += pick(pool); v = !v; }
+  if (must && !w.includes(must)) { const i = rand(w.length); w = w.slice(0, i) + must + w.slice(i + 1); }
+  return w;
+}
+function genLearn() {
+  const all = learnLetters();
+  state.unlocked = Math.max(2, Math.min(state.unlocked, all.length));
+  const letters = all.slice(0, state.unlocked), set = new Set(letters);
+  const focus = focusLetter(letters);
+  const pool = WORDS.filter(w => [...w].every(c => set.has(c)));
+  const focusPool = pool.filter(w => w.includes(focus));
+  const words = [];
+  for (let i = 0; i < 14; i++) {
+    const wantFocus = Math.random() < 0.6;
+    const src = wantFocus ? focusPool : pool;
+    const realOk = src.length >= 4 && Math.random() < (pool.length > 30 ? 0.85 : 0.5);
+    words.push(realOk ? pick(src) : pseudoWord(letters, wantFocus ? focus : null));
+  }
+  return words.join(' ');
+}
+function genWords() {
+  const top = WORDS.slice(0, 200).filter(typable), out = [];
+  for (let i = 0; i < 22; i++) out.push(pick(top));
+  if (!state.settings.punct) return out.join(' ');
+  let s = '', cap = true;
+  out.forEach((w, i) => {
+    let t = cap ? w[0].toUpperCase() + w.slice(1) : w; cap = false;
+    const r = Math.random();
+    if (i === out.length - 1) t += '.';
+    else if (r < 0.1) { t += pick(['.', '.', '?', '!']); cap = true; }
+    else if (r < 0.2) t += ',';
+    else if (r < 0.23) t += pick([';', ':']);
+    else if (r < 0.26) t = `"${t}"`;
+    s += (i ? ' ' : '') + t;
+  });
+  return [...s].filter(c => model.lookup.has(c)).join('');
+}
+function genSentences() {
+  const ok = SENTENCES.filter(typable), out = [];
+  let len = 0;
+  while (len < 110 && ok.length) { const s = pick(ok); if (out.includes(s)) continue; out.push(s); len += s.length; if (out.length >= ok.length) break; }
+  return out.join(' ');
+}
+function genSymbols() {
+  const ok = SNIPPETS.filter(typable), out = [];
+  for (let i = 0; i < 7; i++) out.push(Math.random() < 0.2 ? String(rand(9000) + 10) : pick(ok));
+  return out.join(' ');
+}
+const GENERATORS = { learn: genLearn, words: genWords, sentences: genSentences, symbols: genSymbols };
+
+/* ---------- lesson engine ---------- */
+const textEl = document.getElementById('text');
+let lesson = { text: '', pos: 0, errs: new Set(), startT: 0, lastT: 0 }, spans = [];
+function newLesson() {
+  const text = GENERATORS[state.mode]() || 'the';
+  lesson = { text, pos: 0, errs: new Set(), startT: 0, lastT: 0 };
+  renderText(); renderLetters(); showHint();
+}
+function renderText() {
+  textEl.innerHTML = ''; textEl.scrollTop = 0; spans = [];
+  let word = document.createElement('span'); word.className = 'word';
+  [...lesson.text].forEach(ch => {
+    const s = document.createElement('span');
+    s.className = 'ch' + (ch === ' ' ? ' sp' : '');
+    s.textContent = ch === ' ' ? ' ' : ch;
+    word.appendChild(s); spans.push(s);
+    if (ch === ' ') { textEl.appendChild(word); word = document.createElement('span'); word.className = 'word'; }
+  });
+  textEl.appendChild(word);
+  updateCursor();
+}
+function updateCursor() {
+  spans.forEach((s, i) => s.classList.toggle('cur', i === lesson.pos));
+  const cur = spans[lesson.pos];
+  if (cur) {
+    const lh = cur.offsetHeight || 40, top = cur.offsetTop - textEl.offsetTop;
+    textEl.scrollTop = Math.max(0, top - lh * 0.9);
+  }
+}
+function recordKey(ch, hadErr, dt) {
+  const k = ch.toLowerCase();
+  const ks = state.keyStats[k] ||= { n: 0, ema: null, miss: 0 };
+  ks.n++;
+  ks.miss = ks.n === 1 ? (hadErr ? 1 : 0) : ks.miss * 0.85 + (hadErr ? 0.15 : 0);
+  if (dt != null && !hadErr) { dt = Math.min(dt, 2500); ks.ema = ks.ema == null ? dt : ks.ema * 0.8 + dt * 0.2; }
+}
+function liveWpm(now) {
+  if (!lesson.startT || lesson.pos < 2) return null;
+  return (lesson.pos - 1) / 5 / ((now - lesson.startT) / 60000);
+}
+function finish(now) {
+  const len = lesson.text.length;
+  const wpm = len > 1 ? (len - 1) / 5 / ((now - lesson.startT) / 60000) : 0;
+  const acc = (len - lesson.errs.size) / len;
+  const h = state.history[state.mode] ||= [];
+  h.push({ wpm: Math.round(wpm * 10) / 10, acc: Math.round(acc * 1000) / 1000, t: Date.now() });
+  if (h.length > 200) h.shift();
+  let msg = `${Math.round(wpm)} wpm · ${Math.round(acc * 100)}%`;
+  if (state.mode === 'learn') {
+    const letters = learnLetters().slice(0, state.unlocked);
+    if (state.unlocked < learnLetters().length && letters.every(keyPasses)) {
+      state.unlocked++;
+      msg = `New key unlocked: ${learnLetters()[state.unlocked - 1].toUpperCase()}`;
+    }
+  }
+  save(); toast(msg); renderStats({ wpm, acc }); newLesson();
+}
+function onKey(e) {
+  if (document.getElementById('settings').open) return;
+  if (e.target.closest && e.target.closest('input, textarea, select')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Escape') { e.preventDefault(); newLesson(); return; }
+  pressedFlash(e);
+  if (e.key.length !== 1 || e.repeat) return;
+  e.preventDefault();
+  const expected = lesson.text[lesson.pos];
+  if (expected == null) return;
+  const now = performance.now();
+  if (!lesson.startT) lesson.startT = now;
+  const s = spans[lesson.pos];
+  if (e.key === expected) {
+    const had = lesson.errs.has(lesson.pos);
+    recordKey(expected, had, lesson.lastT ? now - lesson.lastT : null);
+    lesson.lastT = now;
+    s.classList.add('done'); if (had) s.classList.add('err');
+    lesson.pos++;
+    if (lesson.pos >= lesson.text.length) { finish(now); return; }
+    updateCursor(); showHint();
+    const w = liveWpm(now); if (w) document.getElementById('sWpm').innerHTML = `${Math.round(w)}<small> wpm</small>`;
+    if (state.mode === 'learn' && lesson.pos % 6 === 0) renderLetters();
+  } else {
+    lesson.errs.add(lesson.pos);
+    s.classList.add('err'); s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+    showHint(true);
+  }
+}
+function pressedFlash(e) {
+  const expected = lesson.text[lesson.pos];
+  let id = null;
+  if (e.key.length === 1) { const p = model.lookup.get(e.key); id = p && p.id; }
+  else {
+    const want = { ShiftLeft: ['LSFT', 'SHFT'], ShiftRight: ['RSFT', 'SHFT'], Enter: ['ENT'], Backspace: ['BSPC'], Tab: ['TAB'], Escape: ['ESC'] }[e.code];
+    if (want) id = IDS.find(i => want.includes(model.layers[0].tok[i]));
+  }
+  if (id) flash(id, e.key.length === 1 ? (e.key === expected ? 'hit' : 'miss') : 'hit');
+}
+window.addEventListener('keydown', onKey);
+
+/* ---------- stats & letters ---------- */
+function renderStats(last) {
+  const h = state.history[state.mode] || [];
+  const latest = last || h[h.length - 1];
+  document.getElementById('sWpm').innerHTML = latest ? `${Math.round(latest.wpm)}<small> wpm</small>` : '–';
+  document.getElementById('sAcc').innerHTML = latest ? `${Math.round(latest.acc * 100)}<small>%</small>` : '–';
+  const best = h.reduce((m, x) => Math.max(m, x.wpm), 0);
+  document.getElementById('sBest').innerHTML = h.length ? `${Math.round(best)}<small> wpm</small>` : '–';
+  document.getElementById('sCount').textContent = h.length;
+  const pts = h.slice(-20), svg = document.getElementById('spark');
+  if (pts.length < 2) { svg.innerHTML = ''; return; }
+  const max = Math.max(...pts.map(p => p.wpm)) * 1.1 || 1;
+  const xy = pts.map((p, i) => [4 + i * (132 / (pts.length - 1)), 27 - (p.wpm / max) * 24]);
+  svg.innerHTML = `<polyline points="${xy.map(p => p.join(',')).join(' ')}"/><circle cx="${xy.at(-1)[0]}" cy="${xy.at(-1)[1]}" r="2.6"/>`;
+}
+function renderLetters() {
+  const box = document.getElementById('letters');
+  if (state.mode !== 'learn') { box.hidden = true; return; }
+  box.hidden = false;
+  const all = learnLetters(), letters = all.slice(0, state.unlocked), focus = focusLetter(letters);
+  box.innerHTML = '<span class="lbl">Keys</span>';
+  all.forEach((c, i) => {
+    const b = document.createElement('button'), ks = state.keyStats[c], unlocked = i < state.unlocked;
+    b.className = 'chip' + (unlocked ? '' : ' locked') + (c === focus ? ' focus' : '') + (unlocked && keyPasses(c) ? ' pass' : '');
+    const pct = unlocked && ks ? Math.min(100, keyWpm(ks) / state.settings.target * 100) : 0;
+    b.innerHTML = `${c.toUpperCase()}<span class="bar" style="width:${pct}%"></span>`;
+    b.title = unlocked
+      ? (ks && ks.ema ? `${c.toUpperCase()}: ${Math.round(keyWpm(ks))} wpm, ${Math.round(ks.miss * 100)}% recent misses` : `${c.toUpperCase()}: not practiced yet`) + (c === focus ? ' · current focus' : '')
+      : `Click to unlock up to ${c.toUpperCase()}`;
+    b.addEventListener('click', ev => { ev.currentTarget.blur(); state.unlocked = i + 1; save(); newLesson(); });
+    box.appendChild(b);
+  });
+}
+function renderOptions() {
+  const box = document.getElementById('options');
+  box.innerHTML = '';
+  if (state.mode === 'words') {
+    box.innerHTML = `<label><input type="checkbox" id="punct" ${state.settings.punct ? 'checked' : ''}> Capitals and punctuation</label>`;
+    box.querySelector('#punct').addEventListener('change', e => { state.settings.punct = e.target.checked; e.target.blur(); save(); newLesson(); });
+  } else if (state.mode === 'symbols') {
+    box.textContent = 'Numbers and symbols, including the ones on your layers. The hint shows which layer key and Shift to hold.';
+  } else if (state.mode === 'learn') {
+    box.textContent = `A new key unlocks when every unlocked key reaches ${state.settings.target} wpm with few misses. The outlined key is your current focus.`;
+  }
+  box.hidden = !box.innerHTML;
+}
+let toastT;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+/* ---------- modes ---------- */
+function setMode(m) {
+  state.mode = m; save();
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  renderOptions(); renderStats(); newLesson();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', e => { e.currentTarget.blur(); setMode(b.dataset.mode); }));
+document.getElementById('newBtn').addEventListener('click', e => { e.currentTarget.blur(); newLesson(); });
+
+/* ---------- focus overlay ---------- */
+const blurredEl = document.getElementById('blurred');
+const syncFocus = () => { blurredEl.hidden = document.hasFocus(); };
+window.addEventListener('focus', syncFocus); window.addEventListener('blur', syncFocus);
+blurredEl.addEventListener('click', () => { window.focus(); blurredEl.hidden = true; });
+
+/* ---------- settings ---------- */
+const dlg = document.getElementById('settings');
+const $id = id => document.getElementById(id);
+document.getElementById('settingsBtn').addEventListener('click', e => {
+  e.currentTarget.blur();
+  const s = state.settings;
+  $id('target').value = s.target; $id('hint-mode').value = s.hint;
+  $id('opt-fingers').checked = s.fingers; $id('opt-labels').checked = s.labels; $id('opt-heat').checked = s.heat;
+  $id('keymap').value = state.keymap; $id('kmErr').textContent = '';
+  $id('resetProgress').textContent = 'Reset progress'; delete $id('resetProgress').dataset.armed;
+  dlg.showModal();
+});
+function readSettings() {
+  const s = state.settings;
+  s.target = Math.max(10, Math.min(150, Number($id('target').value) || 30));
+  s.hint = $id('hint-mode').value;
+  s.fingers = $id('opt-fingers').checked; s.labels = $id('opt-labels').checked; s.heat = $id('opt-heat').checked;
+  save(); applyViewSettings(); renderOptions(); renderLetters(); showHint();
+}
+['target', 'hint-mode', 'opt-fingers', 'opt-labels', 'opt-heat'].forEach(id => $id(id).addEventListener('change', readSettings));
+dlg.addEventListener('close', () => { readSettings(); });
+$id('applyKm').addEventListener('click', () => {
+  const text = $id('keymap').value, errs = applyKeymapText(text);
+  if (errs) { $id('kmErr').textContent = errs.slice(0, 6).join('\n'); return; }
+  state.keymap = text; save(); $id('kmErr').textContent = '';
+  renderLayerTabs(); newLesson(); toast('Keymap applied');
+});
+$id('resetKm').addEventListener('click', () => { $id('keymap').value = DEFAULT_KEYMAP; $id('kmErr').textContent = 'Default loaded. Click Apply keymap to use it.'; });
+$id('resetProgress').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Click again to erase all stats'; return; }
+  state.keyStats = {}; state.history = {}; state.unlocked = 6; save();
+  b.textContent = 'Progress reset'; delete b.dataset.armed;
+  renderStats(); newLesson();
+});
+
+/* ---------- boot ---------- */
+buildKeyboard(); renderLayerTabs(); applyViewSettings();
+setMode(state.mode);
+syncFocus();
+</script>
