@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -15,11 +16,12 @@ try:
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
-    from gi.repository import Gdk, GLib, Gtk, Pango, PangoCairo
+    from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo
     import cairo
 except (ImportError, ValueError) as exc:
     sys.exit(f"GTK 4 bindings are required: {exc}\nOn Arch/Omarchy: sudo pacman -S gtk4 python-gobject python-cairo")
 
+import theme
 from trainer import (Key, LESSONS, MODES, PRESETS, ROLES, Session, decode_value,
                      encode_value, load_settings, make_lesson, preset, resolve,
                      save_json, save_settings)
@@ -28,42 +30,14 @@ SMOKE_TEST = "--smoke-test" in sys.argv
 if SMOKE_TEST:
     sys.argv.remove("--smoke-test")
 DATA = Path(tempfile.mkdtemp(prefix="sofle-studio-test-")) if SMOKE_TEST else Path(__file__).resolve().parent / ".data"
-BG = "#101519"
-PANEL = "#192126"
-KEY_BG = "#222d34"
-BORDER = "#36444d"
-TEXT = "#e1e9ec"
-MUTED = "#8799a3"
-TEAL = "#83e5c0"
-AMBER = "#f4c784"
-RED = "#ff8c91"
-
-CSS = """
-window { background: #101519; color: #e1e9ec; }
-headerbar { background: #101519; box-shadow: none; border-bottom: 1px solid #28343b; }
-label.title { font-size: 23px; font-weight: 800; letter-spacing: -0.5px; }
-label.subtitle, label.muted { color: #8799a3; }
-label.eyebrow { font-size: 11px; font-weight: bold; letter-spacing: 1.5px; color: #8799a3; }
-label.metric { font-size: 28px; font-weight: 700; font-family: monospace; }
-label.accent { color: #83e5c0; }
-label.hint { font-size: 15px; }
-label.error { color: #ff8c91; }
-label.badge { background: #203a32; color: #83e5c0; padding: 5px 10px; border-radius: 15px; font-size: 11px; }
-button, dropdown { background: #222d34; color: #e1e9ec; border: 1px solid #36444d; border-radius: 9px; box-shadow: none; min-height: 30px; }
-button { padding: 5px 14px; }
-button:hover { background: #30414a; }
-button.primary { background: #83e5c0; color: #11241d; border-color: #83e5c0; font-weight: bold; }
-button.primary:hover { background: #a2efd4; }
-entry, textview { background: #192126; color: #e1e9ec; border-radius: 8px; }
-entry { border: 1px solid #36444d; min-height: 32px; }
-textview { padding: 16px; font-family: monospace; font-size: 16px; }
-.card { background: #192126; border: 1px solid #2b3941; border-radius: 14px; padding: 14px 20px; }
-.practice { background: #192126; border: 1px solid #2b3941; border-radius: 16px; }
-separator { background: #2b3941; }
-progressbar trough { background: #26333b; min-height: 4px; border-radius: 3px; }
-progressbar progress { background: #83e5c0; min-height: 4px; border-radius: 3px; }
-"""
-
+THEME_ROOT = DATA / "omarchy" if SMOKE_TEST else theme.OMARCHY_CURRENT
+# Colours drawn with Cairo; updated in place when the Omarchy theme changes.
+P = theme.load(THEME_ROOT) or theme.palette(theme.DEFAULT)
+theme.register_bundled_font()
+FONT_ROOT = DATA / "fontconfig" if SMOKE_TEST else theme.FONTCONFIG_DIR
+# Smoke tests resolve fonts through their own fontconfig file, leaving the desktop's alone.
+FONT_CONFIG = FONT_ROOT / "fonts.conf" if SMOKE_TEST else None
+FONTS = theme.fonts(THEME_ROOT, FONT_CONFIG)
 
 def color(ctx, value, alpha=1):
     ctx.set_source_rgba(*(int(value[i:i + 2], 16) / 255 for i in (1, 3, 5)), alpha)
@@ -78,16 +52,17 @@ def rounded(ctx, x, y, w, h, radius=10):
     ctx.close_path()
 
 
-def text(ctx, value, x, y, size=15, tint=TEXT, center=False, mono=False, bold=False):
+def text(ctx, value, x, y, size=15, tint=None, center=False, mono=False, bold=False):
     layout = PangoCairo.create_layout(ctx)
-    font = Pango.FontDescription("DejaVu Sans Mono" if mono else "DejaVu Sans")
+    font = Pango.FontDescription()
+    font.set_family(FONTS["mono"] if mono else FONTS["ui"])
     font.set_absolute_size(size * Pango.SCALE)
     if bold:
         font.set_weight(Pango.Weight.BOLD)
     layout.set_font_description(font)
     layout.set_text(value, -1)
     w, h = layout.get_pixel_size()
-    color(ctx, tint)
+    color(ctx, tint or P["text"])
     ctx.move_to(x - w / 2 if center else x, y - h / 2 if center else y)
     PangoCairo.show_layout(ctx, layout)
     ctx.new_path()
@@ -115,7 +90,7 @@ def display_char(char):
 
 def key_label(key, field="base"):
     if key.role != "Character":
-        return {"Backspace": "⌫", "Control": "Ctrl", "Super": "Super", "Layer": "Layer"}.get(key.role, key.role)
+        return {"Backspace": "Bksp", "Control": "Ctrl", "Super": "Super", "Layer": "Layer"}.get(key.role, key.role)
     char = getattr(key, field)
     if not char:
         return "Esc" if key.id == "L10" else "—"
@@ -181,10 +156,10 @@ class Keyboard(Gtk.DrawingArea):
             modifier = key.id in modifier_ids
             selected = key.id == self.selected
             error = key.id == self.flash
-            fill = RED if error else TEAL if active else "#463b2c" if modifier else KEY_BG
-            outline = AMBER if modifier else TEAL if selected else BORDER
+            fill = P["error"] if error else P["accent"] if active else P["modifier_fill"] if modifier else P["key"]
+            outline = P["modifier"] if modifier else P["accent"] if selected else P["border"]
             rounded(ctx, -size/2, -size/2 + 3*scale, size, size, 9*scale)
-            color(ctx, "#090e11")
+            color(ctx, P["shadow"])
             ctx.fill()
             rounded(ctx, -size/2, -size/2, size, size-3*scale, 9*scale)
             color(ctx, fill)
@@ -198,10 +173,10 @@ class Keyboard(Gtk.DrawingArea):
                 if len(value) == 1 and value.isalpha():
                     value = value.upper()
             text(ctx, value, 0, -2*scale, (12 if len(value) > 3 else 19)*scale,
-                 "#13271f" if active or error else AMBER if modifier else TEXT,
+                 P["on_error"] if error else P["on_accent"] if active else P["modifier"] if modifier else P["text"],
                  center=True, bold=active or modifier)
             if key.base.lower() in ("f", "j") and key.row == 2 and shown == "base":
-                color(ctx, "#13271f" if active else MUTED)
+                color(ctx, P["on_accent"] if active else P["muted"])
                 ctx.set_line_width(2*scale)
                 ctx.move_to(-5*scale, 15*scale)
                 ctx.line_to(5*scale, 15*scale)
@@ -209,16 +184,16 @@ class Keyboard(Gtk.DrawingArea):
             ctx.restore()
         for cx in (offset + 425*scale, offset + 507*scale):
             ctx.new_path()
-            color(ctx, BORDER)
+            color(ctx, P["border"])
             ctx.arc(cx, 172*scale, 16*scale, 0, math.tau)
             ctx.set_line_width(2*scale)
             ctx.stroke()
-            color(ctx, MUTED)
+            color(ctx, P["muted"])
             ctx.move_to(cx, 159*scale)
             ctx.line_to(cx, 165*scale)
             ctx.stroke()
-        text(ctx, "L", offset + 200*scale, 5*scale, 10*scale, MUTED, center=True)
-        text(ctx, "R", offset + 735*scale, 5*scale, 10*scale, MUTED, center=True)
+        text(ctx, "L", offset + 200*scale, 5*scale, 10*scale, P["muted"], center=True)
+        text(ctx, "R", offset + 735*scale, 5*scale, 10*scale, P["muted"], center=True)
 
 
 class Practice(Gtk.DrawingArea):
@@ -301,7 +276,8 @@ class Practice(Gtk.DrawingArea):
         size = 23
         char_width, _ = text(ctx, "", 0, 0, size, mono=True)
         layout = PangoCairo.create_layout(ctx)
-        font = Pango.FontDescription("DejaVu Sans Mono")
+        font = Pango.FontDescription()
+        font.set_family(FONTS["mono"])
         font.set_absolute_size(size * Pango.SCALE)
         layout.set_font_description(font)
         layout.set_text("M", -1)
@@ -330,22 +306,23 @@ class Practice(Gtk.DrawingArea):
             for offset, i in enumerate(range(a, b)):
                 x = 32 + offset*char_width
                 char = session.target[i]
-                show = {"\n": "↵", "\t": "⇥"}.get(char, char)
-                tint = TEAL if i < session.index else MUTED
+                # Markers every Omarchy font has, so none falls back to another font.
+                show = {"\n": "¶", "\t": "→"}.get(char, char)
+                tint = P["accent"] if i < session.index else P["muted"]
                 if i == session.index:
                     rounded(ctx, x-1, y-2, char_width+2, 32, 4)
-                    color(ctx, RED if self.owner.error_active else TEAL)
+                    color(ctx, P["error"] if self.owner.error_active else P["accent"])
                     ctx.fill()
-                    tint = "#11241d"
+                    tint = P["on_error"] if self.owner.error_active else P["on_accent"]
                     if char == " ":
                         show = "·"
                 text(ctx, show, x, y, size, tint, mono=True)
         if session.paused_at is not None:
             rounded(ctx, 1, 1, width-2, height-2, 15)
-            color(ctx, BG, .93)
+            color(ctx, P["bg"], .93)
             ctx.fill()
-            text(ctx, "Paused", width/2, height/2-14, 25, TEAL, center=True, bold=True)
-            text(ctx, "Click here or press Esc to continue", width/2, height/2+21, 14, MUTED, center=True)
+            text(ctx, "Paused", width/2, height/2-14, 25, P["accent"], center=True, bold=True)
+            text(ctx, "Click here or press Esc to continue", width/2, height/2+21, 14, P["muted"], center=True)
 
 
 class TrainerWindow(Gtk.ApplicationWindow):
@@ -445,12 +422,11 @@ class TrainerWindow(Gtk.ApplicationWindow):
         self.map_label.set_ellipsize(Pango.EllipsizeMode.END)
         self.map_label.set_max_width_chars(25)
         footer.append(self.map_label)
-        legend = label("● Next key    ● Hold modifier", "muted")
-        legend.set_markup('<span foreground="#83e5c0">●</span> Next key    <span foreground="#f4c784">●</span> Hold modifier')
+        self.legend = legend = label("", "muted")
         legend.set_hexpand(True)
         legend.set_xalign(.5)
         footer.append(legend)
-        footer.append(label("Esc pause  ·  Ctrl+R restart", "muted"))
+        footer.append(label("Esc pause  ·  Ctrl+R restart  ·  Ctrl+Q quit", "muted"))
         root.append(footer)
         self.mode.connect("notify::selected", self.selection_changed)
         self.lesson.connect("notify::selected", self.selection_changed)
@@ -519,6 +495,8 @@ class TrainerWindow(Gtk.ApplicationWindow):
             self.status.add_css_class("error")
         self.layer_badge.set_text("SYMBOL LAYER" if guidance and guidance.field.startswith("layer") else "BASE + SHIFT" if guidance and guidance.field == "shifted" else "BASE")
         self.map_label.set_text(f"{self.keymap_name} · Sofle 58")
+        self.legend.set_markup(f'<span foreground="{P["accent"]}" size="x-large">•</span> Next key    '
+                               f'<span foreground="{P["modifier"]}" size="x-large">•</span> Hold modifier')
         self.practice.queue_draw()
         self.keyboard.queue_draw()
 
@@ -569,7 +547,8 @@ class TrainerWindow(Gtk.ApplicationWindow):
         was_paused = self.session.paused_at is not None
         if not was_paused:
             self.session.toggle_pause()
-        dialog = Gtk.Window(title=title, transient_for=self, modal=True)
+        # Belonging to the app gives dialogs its shortcuts, such as Ctrl+Q.
+        dialog = Gtk.Window(title=title, transient_for=self, modal=True, application=self.get_application())
         dialog.set_default_size(width, height)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         for setter in (box.set_margin_start, box.set_margin_end, box.set_margin_top, box.set_margin_bottom):
@@ -717,17 +696,106 @@ class App(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="io.local.SofleStudio.Test" if SMOKE_TEST else "io.local.SofleStudio")
         self.smoke_failed = False
+        self.provider = None
+        self.monitors = []
+        self.theme_timer = None
 
     def do_activate(self):
-        provider = Gtk.CssProvider()
-        provider.load_from_string(CSS)
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        if self.provider is None:
+            if SMOKE_TEST:
+                self.write_smoke_theme(theme.DEFAULT | {"accent": "#7aa2f7"})
+                self.smoke_fonts = self.installed_fonts()[:2]
+                self.write_smoke_font(self.smoke_fonts[0])
+            self.provider = Gtk.CssProvider()
+            Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), self.provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self.apply_theme()
+            self.watch_theme()
+            quit_action = Gio.SimpleAction.new("quit", None)
+            quit_action.connect("activate", lambda *_: self.quit())
+            self.add_action(quit_action)
+            # Free in Omarchy, whose only Q shortcut is Super+Ctrl+Q, and unused by GTK text fields.
+            self.set_accels_for_action("app.quit", ["<Control>q"])
         window = self.get_active_window()
         if window is None:
             window = TrainerWindow(self)
         window.present()
         if SMOKE_TEST:
             GLib.timeout_add(600, self.smoke_checks, window)
+
+    def apply_theme(self):
+        """Load the current Omarchy colours and font; keep the last good colours if the theme is mid-swap."""
+        loaded = theme.load(THEME_ROOT)
+        if loaded:
+            P.clear()
+            P.update(loaded)
+        FONTS.update(theme.fonts(THEME_ROOT, FONT_CONFIG))
+        self.provider.load_from_string(theme.css(P, FONTS))
+        Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", P["mode"] == "dark")
+        for window in Gtk.Window.get_toplevels():
+            if isinstance(window, TrainerWindow):
+                window.refresh()
+            for widget in self.walk(window):
+                if isinstance(widget, Gtk.DrawingArea):
+                    widget.queue_draw()
+
+    def watch_theme(self):
+        # `omarchy theme set` replaces current/theme and then rewrites current/theme.name;
+        # `omarchy font set` rewrites fontconfig/fonts.conf.
+        for path in (THEME_ROOT, FONT_ROOT):
+            try:
+                monitor = Gio.File.new_for_path(str(path)).monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, None)
+            except GLib.Error:
+                continue
+            monitor.connect("changed", self.theme_changed)
+            self.monitors.append(monitor)
+
+    def theme_changed(self, *_):
+        # One theme change emits several events; reload once they settle.
+        if self.theme_timer:
+            GLib.source_remove(self.theme_timer)
+        self.theme_timer = GLib.timeout_add(200, self.theme_settled)
+
+    def theme_settled(self):
+        self.theme_timer = None
+        self.apply_theme()
+        return False
+
+    @staticmethod
+    def installed_fonts():
+        try:
+            listed = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            return []
+        return sorted({line.split(",")[0].strip() for line in listed.splitlines() if line.strip()})
+
+    @staticmethod
+    def write_smoke_font(family):
+        """Set the monospace font the way `omarchy font set` does, on top of the system fontconfig."""
+        FONT_ROOT.mkdir(parents=True, exist_ok=True)
+        family = family.replace("&", "&amp;").replace("<", "&lt;")
+        FONT_CONFIG.write_text(f"""<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <match target="pattern">
+    <test name="family" qual="any"><string>monospace</string></test>
+    <edit name="family" mode="prepend_first" binding="strong"><string>{family}</string></edit>
+  </match>
+</fontconfig>
+""")
+
+    @staticmethod
+    def write_smoke_theme(colors):
+        """Swap in a theme the way `omarchy theme set` does."""
+        next_theme = THEME_ROOT / "next-theme"
+        next_theme.mkdir(parents=True, exist_ok=True)
+        (next_theme / "colors.toml").write_text("".join(f'{k} = "{v}"\n' for k, v in colors.items()))
+        current = THEME_ROOT / "theme"
+        if current.exists():
+            (current / "colors.toml").unlink()
+            current.rmdir()
+        next_theme.rename(current)
+        (THEME_ROOT / "theme.name").write_text("smoke\n")
 
     def smoke_checks(self, window):
         try:
@@ -820,8 +888,48 @@ class App(Gtk.Application):
 
     def smoke_snapshot(self, window):
         try:
+            assert P["accent"] == "#7aa2f7", "Omarchy theme not loaded at startup"
+            if len(self.smoke_fonts) == 2:
+                assert FONTS["ui"] == self.smoke_fonts[0], f"Omarchy font not loaded: {FONTS}"
             self.save_snapshot(window, "/tmp/sofle-studio-preview.png")
-            print("Native UI checks passed. Preview: /tmp/sofle-studio-preview.png", flush=True)
+            if len(self.smoke_fonts) == 2:
+                # Change the font alone while the app is open; its file monitor should restyle it.
+                self.write_smoke_font(self.smoke_fonts[1])
+                GLib.timeout_add(1000, self.smoke_font_reloaded, window)
+            else:
+                self.smoke_font_reloaded(window)
+        except Exception:
+            traceback.print_exc()
+            self.smoke_failed = True
+            self.quit()
+        return False
+
+    def smoke_font_reloaded(self, window):
+        try:
+            if len(self.smoke_fonts) == 2:
+                assert FONTS["ui"] == FONTS["mono"] == self.smoke_fonts[1], f"Font change was not picked up: {FONTS}"
+                assert P["accent"] == "#7aa2f7"
+            # Then change the theme alone.
+            self.write_smoke_theme({"mode": "light", "background": "#eff1f5", "foreground": "#4c4f69",
+                                    "accent": "#1e66f5", "red": "#d20f39", "yellow": "#df8e1d"})
+            GLib.timeout_add(1000, self.smoke_theme_reloaded, window)
+        except Exception:
+            traceback.print_exc()
+            self.smoke_failed = True
+            self.quit()
+        return False
+
+    def smoke_theme_reloaded(self, window):
+        try:
+            assert P["accent"] == "#1e66f5" and P["mode"] == "light", "Theme change was not picked up"
+            assert "#1e66f5" in window.legend.get_label()
+            self.save_snapshot(window, "/tmp/sofle-studio-theme-preview.png")
+            assert self.get_accels_for_action("app.quit") == ["<Control>q"]
+            print(f"Native UI checks passed. Fonts tried: {', '.join(self.smoke_fonts) or 'none'}. "
+                  "Preview: /tmp/sofle-studio-preview.png", flush=True)
+            # Leave through the same action Ctrl+Q triggers.
+            window.activate_action("app.quit", None)
+            return False
         except Exception:
             traceback.print_exc()
             self.smoke_failed = True
@@ -834,6 +942,10 @@ class App(Gtk.Application):
         snapshot = Gtk.Snapshot.new()
         paintable.snapshot(snapshot, window.get_width(), window.get_height())
         node = snapshot.to_node()
+        if node is None:
+            # Nothing has been drawn, as when the compositor pauses drawing while the screen is off.
+            print(f"Preview skipped, the display is not drawing: {path}", flush=True)
+            return
         texture = window.get_native().get_renderer().render_texture(node, None)
         assert texture.save_to_png(path)
 
